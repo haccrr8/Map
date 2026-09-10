@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AETHERIS // High-Def Satellite Hologram Tracker</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #050505; }
+    
+    #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; filter: contrast(1.15) saturate(1.2); }
+    
+    /* --- CINEMATIC INTRO LOADER --- */
+    #loader {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: #020408;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #00f3ff;
+      transition: opacity 0.8s ease;
+    }
+    .loader-ring {
+      width: 80px; height: 80px;
+      border: 3px solid rgba(0, 243, 255, 0.2);
+      border-top: 3px solid #00f3ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+      box-shadow: 0 0 25px rgba(0, 243, 255, 0.5);
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* --- STYLISH HUD UI PANEL --- */
+    .ui-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(5, 10, 20, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 243, 255, 0.4);
+      color: #fff;
+      padding: 20px;
+      border-radius: 14px;
+      width: 340px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 243, 255, 0.1);
+    }
+
+    .ui-panel h3 { font-size: 18px; margin-bottom: 6px; color: #00f3ff; letter-spacing: 1px; text-transform: uppercase; }
+    .ui-panel p { font-size: 12px; margin-bottom: 12px; color: #a0aec0; line-height: 1.4; }
+    
+    .btn {
+      background: linear-gradient(135deg, #00f3ff, #0066ff);
+      color: #000;
+      border: none;
+      padding: 11px 14px;
+      font-weight: 700;
+      font-size: 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 10px;
+      transition: all 0.3s;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 0 25px rgba(0, 243, 255, 0.8); }
+    
+    .btn-secondary {
+      background: linear-gradient(135deg, #ff0055, #990033);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(255, 0, 85, 0.4);
+    }
+    .btn-secondary:hover { box-shadow: 0 0 25px rgba(255, 0, 85, 0.8); }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 243, 255, 0.3);
+      background: rgba(0, 0, 0, 0.6);
+      color: #00f3ff;
+      font-size: 13px;
+      outline: none;
+    }
+    input[type="text"]::placeholder { color: #556677; }
+
+    .status-box {
+      font-size: 12px;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.7);
+      border-left: 4px solid #00f3ff;
+      border-radius: 4px;
+      margin-top: 8px;
+      color: #e2e8f0;
+      font-family: monospace;
+    }
+
+    /* --- HIGH-DEF 3D HOLOGRAM AVATAR FX --- */
+    .hologram-wrapper {
+      position: relative;
+      width: 70px;
+      height: 70px;
+    }
+
+    .holo-cone {
+      position: absolute;
+      top: -95px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 40px solid transparent;
+      border-right: 40px solid transparent;
+      border-top: 100px solid rgba(0, 243, 255, 0.35);
+      filter: drop-shadow(0 0 20px rgba(0, 243, 255, 0.9));
+      animation: holo-flicker 1.2s infinite alternate ease-in-out;
+      pointer-events: none;
+    }
+
+    .holo-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 60px;
+      height: 60px;
+      margin-top: -30px;
+      margin-left: -30px;
+      border: 2px dashed #00f3ff;
+      border-radius: 50%;
+      box-shadow: 0 0 20px #00f3ff, inset 0 0 20px #00f3ff;
+      animation: holo-spin-ring 3s linear infinite;
+    }
+
+    .holo-core {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 14px;
+      height: 14px;
+      margin-top: -7px;
+      margin-left: -7px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 25px #00f3ff, 0 0 50px #00f3ff;
+      animation: holo-pulse 1s infinite ease-in-out;
+    }
+
+    @keyframes holo-spin-ring {
+      0% { transform: rotate(0deg) rotateX(65deg); }
+      100% { transform: rotate(360deg) rotateX(65deg); }
+    }
+
+    @keyframes holo-pulse {
+      0%, 100% { transform: scale(0.8); opacity: 0.7; }
+      50% { transform: scale(1.5); opacity: 1; }
+    }
+
+    @keyframes holo-flicker {
+      0% { opacity: 0.5; transform: translateX(-50%) scaleX(0.85); }
+      50% { opacity: 1; transform: translateX(-50%) scaleX(1.15); }
+      100% { opacity: 0.6; transform: translateX(-50%) scaleX(0.9); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cinematic Startup Loader -->
+  <div id="loader">
+    <div class="loader-ring"></div>
+    <h2 style="letter-spacing: 2px; font-size: 16px;">LOADING SATELLITE MATRIX...</h2>
+    <p style="font-size: 11px; margin-top: 5px; color: #557788;">Establishing Secure Holographic Link</p>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- HUD Control Panel -->
+  <div class="ui-panel">
+    <h3>🛰️ HOLOGRAPHIC TRACKER</h3>
+    <p>लाइव सैटलाइट एचडी व्यू और रियल-टाइम कनेक्शन इंजन।</p>
+    
+    <div class="status-box" id="status">सिग्नल इनिशियलाइज हो रहा है...</div>
+    <br>
+
+    <button class="btn" onclick="copyShareLink()">🔗 कनेक्टिंग लिंक कॉपी करें</button>
+    
+    <hr style="border-color: rgba(255,255,255,0.1); margin: 12px 0;">
+    
+    <p>साथी की Peer ID दर्ज करें:</p>
+    <input type="text" id="peer-id-input" placeholder="यहाँ ID पेस्ट करें...">
+    <button class="btn btn-secondary" onclick="connectToPeer()">⚡ तुरंत कनेक्ट करें</button>
+  </div>
+
+  <!-- Leaflet & PeerJS Libraries -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  
+  <script>
+    // 1. High-Definition Satellite Map Setup
+    const map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // High-Resolution World Imagery (Crystal Clear Trees & Houses)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: 'Esri Satellite'
+    }).addTo(map);
+
+    // Crisp Labels Overlay for Roads & Places
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    let myLocation = null;
+    let myMarker = null;
+    let peerMarker = null;
+    let connectionLine = null;
+    let peer = null;
+    let conn = null;
+
+    const statusEl = document.getElementById('status');
+
+    // Remove Loader after 1.5 seconds with fade effect
+    setTimeout(() => {
+      const loader = document.getElementById('loader');
+      loader.style.opacity = '0';
+      setTimeout(() => loader.style.display = 'none', 800);
+    }, 1500);
+
+    // 2. Custom Hologram Icon
+    const customHologramIcon = L.divIcon({
+      className: 'custom-holo-marker',
+      html: `
+        <div class="hologram-wrapper">
+          <div class="holo-cone"></div>
+          <div class="holo-ring"></div>
+          <div class="holo-core"></div>
+        </div>
+      `,
+      iconSize: [70, 70],
+      iconAnchor: [35, 35]
+    });
+
+    // 3. Ultra-Fast GPS Geolocation Tracker
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          myLocation = [lat, lng];
+
+          if (!myMarker) {
+            myMarker = L.marker(myLocation, { icon: customHologramIcon })
+              .addTo(map)
+              .bindPopup("<b style='color:#00f3ff;'>HOLOGRAPHIC AVATAR (YOU)</b>")
+              .openPopup();
+            
+            map.setView(myLocation, 18); // Extreme High-Zoom to show exact houses/trees
+          } else {
+            myMarker.setLatLng(myLocation);
+          }
+
+          if (conn && conn.open) {
+            conn.send({ type: 'location', coords: myLocation });
+          }
+
+          updateConnectionLine();
+        },
+        (error) => {
+          statusEl.innerText = "⚠️ GPS अनुमति दें (Location Access Denied)";
+          alert("कृपया अपने डिवाइस का GPS ऑन करें और लोकेशन की अनुमति दें!");
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
+    } else {
+      alert("आपका ब्राउज़र GPS सपोर्ट नहीं करता।");
+    }
+
+    // 4. Robust PeerJS Engine (Instant Connection Setup)
+    peer = new Peer();
+
+    peer.on('open', (id) => {
+      statusEl.innerText = `ID जनरेटेड: ${id.substring(0, 6)}... (रेडी)`;
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const connectId = urlParams.get('connect');
+      if (connectId) {
+        document.getElementById('peer-id-input').value = connectId;
+        statusEl.innerText = "ऑटो-कनेक्ट हो रहा है...";
+        setTimeout(() => connectToPeer(), 800);
+      }
+    });
+
+    peer.on('error', (err) => {
+      statusEl.innerText = "कनेक्शन एरर! रिफ्रेश करें।";
+    });
+
+    peer.on('connection', (incomingConn) => {
+      conn = incomingConn;
+      setupConnection();
+    });
+
+    function connectToPeer() {
+      const peerId = document.getElementById('peer-id-input'].value.trim();
+      if (!peerId) return alert("कृपया सही Peer ID दर्ज करें!");
+      
+      statusEl.innerText = "सिग्नल मिलाया जा रहा है...";
+      conn = peer.connect(peerId);
+      setupConnection();
+    }
+
+    function setupConnection() {
+      if (!conn) return;
+
+      conn.on('open', () => {
+        statusEl.style.borderLeftColor = "#00ff66";
+        statusEl.innerText = "✅ लाइव कनेक्टेड (Live Link Active)";
+        
+        if (myLocation) {
+          conn.send({ type: 'location', coords: myLocation });
+        }
+      });
+
+      conn.on('data', (data) => {
+        if (data.type === 'location') {
+          const peerCoords = data.coords;
+
+          if (!peerMarker) {
+            peerMarker = L.marker(peerCoords, { icon: customHologramIcon })
+              .addTo(map)
+              .bindPopup("<b style='color:#ff0055;'>साथी (PARTNER LINKED)</b>")
+              .openPopup();
+          } else {
+            peerMarker.setLatLng(peerCoords);
+          }
+
+          updateConnectionLine();
+        }
+      });
+
+      conn.on('close', () => {
+        statusEl.style.borderLeftColor = "#ff0055";
+        statusEl.innerText = "❌ कनेक्शन टूट गया।";
+      });
+    }
+
+    // 5. Dynamic Neon Connection Line
+    function updateConnectionLine() {
+      if (myMarker && peerMarker) {
+        const p1 = myMarker.getLatLng();
+        const p2 = peerMarker.getLatLng();
+
+        const latlngs = [[p1.lat, p1.lng], [p2.lat, p2.lng]];
+
+        if (!connectionLine) {
+          connectionLine = L.polyline(latlngs, {
+            color: '#00f3ff',
+            weight: 5,
+            opacity: 0.95,
+            dashArray: '10, 10'
+          }).addTo(map);
+        } else {
+          connectionLine.setLatLngs(latlngs);
+        }
+
+        map.fitBounds(L.latLngBounds([p1, p2]), { padding: [80, 80] });
+      }
+    }
+
+    // Share Link Generator
+    function copyShareLink() {
+      if (!peer || !peer.id) return alert("सिस्टम इनिशियलाइज हो रहा है, 2 सेकंड रुकें!");
+      
+      const shareUrl = `${window.location.origin}${window.location.pathname}?connect=${peer.id}`;
+      navigator.clipboard.writeText(shareUrl);
+      alert("✨ लिंक कॉपी हो गया! इसे अपने दोस्त को भेजें। जैसे ही वो खोलेगा, तुरंत नीली लाइन से कनेक्ट हो जाएगा!");
+    }
+  </script>
+</body>
+</html>
